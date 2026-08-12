@@ -2,12 +2,12 @@
   "name": "water_website_server",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/server.js",
+  "main": "dist-server/server.js",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist-server/server.js"
   },
   "repository": {
     "type": "git",
