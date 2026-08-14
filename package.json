@@ -21,15 +21,25 @@
   },
   "homepage": "https://github.com/shine25-ai/water_website_server#readme",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1110.0",
+    "@aws-sdk/s3-request-presigner": "^3.1110.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "mongoose": "^9.9.2"
+    "mongoose": "^9.9.2",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.5",
+    "pdfkit": "^0.19.1",
+    "razorpay": "^2.9.8",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
     "@types/node": "^26.2.0",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pdfkit": "^0.17.6",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",

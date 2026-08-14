@@ -5,6 +5,8 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import healthRoutes from "./routes/health.routes.js";
+import donationRoutes from "./routes/donation.routes.js";
+import volunteerRoutes from "./routes/Volunteer.routes.js";
 
 dotenv.config();
 
@@ -26,6 +28,8 @@ app.use(express.urlencoded({ extended: true }));
 // Healthcheck API Routes
 app.use("/api/health", healthRoutes);
 app.use("/health", healthRoutes);
+app.use("/api/donations", donationRoutes);
+app.use("/api/volunteers", volunteerRoutes);
 
 // Base API route
 app.get("/api", (req, res) => {
