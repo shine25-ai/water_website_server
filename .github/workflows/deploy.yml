@@ -1,65 +1,255 @@
-name: Deploy Backend
+name: Deploy Nallathangal Backend
 
 on:
   push:
     branches:
-      - development
+      - dev-production
 
 jobs:
   deploy-backend:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+
+      # ==========================================================
+      # 1. Checkout Backend
+      # ==========================================================
+      - name: Checkout backend code
         uses: actions/checkout@v4
 
+
+      # ==========================================================
+      # 2. Setup Node.js
+      # ==========================================================
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 23
           cache: npm
 
+
+      # ==========================================================
+      # 3. Install dependencies on GitHub
+      # ==========================================================
       - name: Install dependencies
         run: npm ci
 
+
+      # ==========================================================
+      # 4. Build Backend
+      # ==========================================================
       - name: Build backend
         run: npm run build
 
+
+      # ==========================================================
+      # 5. Verify build
+      # ==========================================================
+      - name: Verify backend build
+        run: |
+          echo "Checking dist-server..."
+
+          if [ ! -f "dist-server/server.js" ]; then
+            echo "ERROR: dist-server/server.js not found!"
+            exit 1
+          fi
+
+          ls -lah dist-server
+          echo "Backend build verified successfully."
+
+
+      # ==========================================================
+      # 6. Upload Backend Build + package files
+      # ==========================================================
       - name: Upload backend to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST1 }}
           username: ${{ secrets.SERVER_USER1 }}
           key: ${{ secrets.SERVER_SSH_KEY1 }}
-          source: "dist-server/**,package.json,package-lock.json"
-          target: "/root/nallathangal/water_website_server"
-          strip_components: 0
 
-      - name: Install modules and restart backend
+          source: |
+            dist-server/**
+            package.json
+            package-lock.json
+
+          target: /root/nallathangal/water_website_server
+
+
+      # ==========================================================
+      # 7. Install modules + restart PM2
+      # ==========================================================
+      - name: Install dependencies and restart backend
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.SERVER_HOST1 }}
           username: ${{ secrets.SERVER_USER1 }}
           key: ${{ secrets.SERVER_SSH_KEY1 }}
+
           script: |
+
+            # ----------------------------------------------------
+            # Stop on errors
+            # ----------------------------------------------------
             set -e
 
+
+            # ----------------------------------------------------
+            # Load NVM
+            # ----------------------------------------------------
+            export NVM_DIR="$HOME/.nvm"
+
+            if [ -s "$NVM_DIR/nvm.sh" ]; then
+              source "$NVM_DIR/nvm.sh"
+            fi
+
+            if [ -s "$NVM_DIR/bash_completion" ]; then
+              source "$NVM_DIR/bash_completion"
+            fi
+
+
+            # ----------------------------------------------------
+            # Show Node / NPM versions
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "Node version"
+            echo "======================================"
+
+            node -v
+
+            echo "======================================"
+            echo "NPM version"
+            echo "======================================"
+
+            npm -v
+
+
+            # ----------------------------------------------------
+            # Check PM2
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "PM2 version"
+            echo "======================================"
+
+            pm2 -v
+
+
+            # ----------------------------------------------------
+            # Go to backend directory
+            # ----------------------------------------------------
             cd /root/nallathangal/water_website_server
 
-            echo "Installing/updating backend dependencies..."
+
+            # ----------------------------------------------------
+            # Verify uploaded files
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "Backend directory"
+            echo "======================================"
+
+            pwd
+
+            echo "Files:"
+            ls -lah
+
+
+            # ----------------------------------------------------
+            # Install / update production dependencies
+            #
+            # This automatically installs newly added modules
+            # from package.json / package-lock.json
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "Installing backend dependencies"
+            echo "======================================"
+
             npm ci --omit=dev
 
-            echo "Checking build..."
+
+            # ----------------------------------------------------
+            # Verify production build
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "Checking dist-server"
+            echo "======================================"
+
+            if [ ! -f "dist-server/server.js" ]; then
+              echo "ERROR: dist-server/server.js does not exist!"
+              exit 1
+            fi
+
             ls -lah dist-server
 
-            echo "Restarting backend..."
-            pm2 restart nallathangal-backend
 
+            # ----------------------------------------------------
+            # Check PM2 application
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "Checking PM2"
+            echo "======================================"
+
+            if pm2 describe nallathangal-backend > /dev/null 2>&1; then
+
+              echo "PM2 application exists."
+              echo "Restarting nallathangal-backend..."
+
+              pm2 restart nallathangal-backend
+
+            else
+
+              echo "PM2 application does not exist."
+              echo "Starting backend..."
+
+              pm2 start dist-server/server.js \
+                --name nallathangal-backend
+
+            fi
+
+
+            # ----------------------------------------------------
+            # Save PM2 process
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "Saving PM2 process"
+            echo "======================================"
+
+            pm2 save
+
+
+            # ----------------------------------------------------
+            # Wait for backend
+            # ----------------------------------------------------
+            echo "======================================"
             echo "Waiting for backend..."
-            sleep 3
+            echo "======================================"
 
-            echo "Checking backend..."
+            sleep 5
+
+
+            # ----------------------------------------------------
+            # Check PM2 status
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "PM2 status"
+            echo "======================================"
+
+            pm2 status
+
+
+            # ----------------------------------------------------
+            # Test backend locally
+            # ----------------------------------------------------
+            echo "======================================"
+            echo "Testing backend health"
+            echo "======================================"
+
             curl -f http://127.0.0.1:5015/api/health
 
+
+            # ----------------------------------------------------
+            # Deployment completed
+            # ----------------------------------------------------
             echo ""
-            echo "Backend deployment successful!"
+            echo "======================================"
+            echo "BACKEND DEPLOYMENT SUCCESSFUL"
+            echo "======================================"
