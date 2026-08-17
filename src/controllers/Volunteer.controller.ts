@@ -4,7 +4,7 @@ import {
   getVolunteerById,
   getAllVolunteers,
 } from "../services/Volunteer.service.js";
-import { generateVolunteerIdCard } from "../utils/IdCard.util.js";
+import { generateVolunteerIdCard } from "../utils/Idcard.util.js";
 import { uploadBufferToS3, getBufferFromS3 } from "../utils/S3.util.js";
 
 export const createVolunteerController = async (req: Request, res: Response) => {
