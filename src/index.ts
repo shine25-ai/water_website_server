@@ -7,8 +7,22 @@ import { fileURLToPath } from "url";
 import healthRoutes from "./routes/health.routes.js";
 import donationRoutes from "./routes/donation.routes.js";
 import volunteerRoutes from "./routes/Volunteer.routes.js";
+import authRoutes from "./routes/Auth.routes.js";
+import overviewRoutes from "./routes/Overview.routes.js";
+import fundraisingRoutes from "./routes/Fundraising.routes.js";
+import dashboardRoutes from "./routes/Dashboard.routes.js";
+import galleryRoutes from "./routes/Gallery.routes.js";
+import newsupdateRoutes from "./routes/Newsupdate.routes.js";
+import documentRoutes from "./routes/Document.routes.js";
 
 dotenv.config();
+
+console.log("[env check]", {
+  cwd: process.cwd(),
+  hasUsername: !!process.env.ADMIN_USERNAME,
+  hasPassword: !!process.env.ADMIN_PASSWORD,
+  hasSecret: !!process.env.JWT_SECRET,
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,11 +39,24 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve uploaded files (gallery photos, banner images, etc.) — uploads/
+// lives at the project root, same level as this server's cwd.
+const uploadsPath = path.resolve(process.cwd(), "uploads");
+fs.mkdirSync(uploadsPath, { recursive: true });
+app.use("/uploads", express.static(uploadsPath));
+
 // Healthcheck API Routes
 app.use("/api/health", healthRoutes);
 app.use("/health", healthRoutes);
 app.use("/api/donations", donationRoutes);
 app.use("/api/volunteers", volunteerRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/overview", overviewRoutes);
+app.use("/api/fundraising", fundraisingRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/gallery", galleryRoutes);
+app.use("/api/news", newsupdateRoutes);
+app.use("/api/documents", documentRoutes);
 
 // Base API route
 app.get("/api", (req, res) => {
