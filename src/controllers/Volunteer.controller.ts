@@ -1,11 +1,13 @@
 import type { Request, Response } from "express";
 import {
+  generateVolunteerId,
   createVolunteer,
   getVolunteerById,
   getAllVolunteers,
 } from "../services/Volunteer.service.js";
 import { generateVolunteerIdCard } from "../utils/Idcard.util.js";
-import { uploadBufferToS3, getBufferFromS3 } from "../utils/S3.util.js";
+import { buildS3Key, uploadBufferToS3, getBufferFromS3 } from "../utils/S3.util.js";
+import { resizeForIdCard } from "../utils/Image.util.js";
 
 export const createVolunteerController = async (req: Request, res: Response) => {
   try {
@@ -43,8 +45,6 @@ export const createVolunteerController = async (req: Request, res: Response) => 
       return res.status(400).json({ success: false, message: "Please enter a valid age" });
     }
 
-    // "contributions" arrives as a JSON string inside the multipart body
-    // (multer only gives us plain string fields, not nested arrays).
     let parsedContributions: string[] = [];
     if (contributions) {
       try {
@@ -54,43 +54,81 @@ export const createVolunteerController = async (req: Request, res: Response) => 
       }
     }
 
-    // multer.memoryStorage() gives us the raw file bytes on req.file.buffer
-    // — upload straight to S3, no temp file on disk at any point.
+    // Resize once, up front, and reuse the same small buffer for both the
+    // S3 upload and the PDF — a phone photo can be 3-8MB; the card only
+    // ever displays it at postage-stamp size, and the smaller buffer
+    // makes everything downstream faster too.
+    let photoBuffer: Buffer | undefined;
     let photoKey: string | undefined;
     if (req.file) {
-      const uploadResult = await uploadBufferToS3(
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype
-      );
-      photoKey = uploadResult.key;
+      photoBuffer = await resizeForIdCard(req.file.buffer);
+      photoKey = buildS3Key(req.file.originalname);
     }
 
-    const volunteer = await createVolunteer({
-      name,
-      email,
-      mobile,
-      village,
-      district,
-      profession,
-      age: numericAge,
-      interestArea,
-      contributions: parsedContributions,
-      photoKey,
-    });
+    // The only step that has to happen first: the running-count query
+    // that assigns the human-facing volunteerId. Everything after this —
+    // the S3 upload, the Mongo insert, and the PDF render — runs at the
+    // same time instead of waiting on each other in sequence.
+    const volunteerId = await generateVolunteerId();
 
-    return res.status(201).json({
-      success: true,
-      message: "Volunteer registered successfully",
-      data: volunteer,
-    });
+    const [volunteer, , pdfBuffer] = await Promise.all([
+      createVolunteer({
+        name,
+        email,
+        mobile,
+        village,
+        district,
+        profession,
+        age: numericAge,
+        interestArea,
+        contributions: parsedContributions,
+        photoKey,
+        volunteerId,
+      }),
+      photoBuffer && photoKey
+        ? uploadBufferToS3(photoKey, photoBuffer, "image/jpeg")
+        : Promise.resolve(),
+      generateVolunteerIdCard({
+        volunteerId,
+        name,
+        email,
+        mobile,
+        village,
+        district,
+        profession,
+        age: numericAge,
+        interestArea,
+        contributions: parsedContributions,
+        photoBuffer,
+        issueDate: new Date(),
+      }),
+    ]);
+
+    // The response IS the PDF — no second request from the frontend to
+    // fetch it, and no re-download of the photo from S3 to build it.
+    // volunteerId / the Mongo _id ride along as headers instead of a
+    // JSON body (remember to expose these via CORS — see notes below).
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="Volunteer-ID-${volunteerId}.pdf"`
+    );
+    res.setHeader("X-Volunteer-Id", volunteerId);
+    res.setHeader("X-Volunteer-Record-Id", String(volunteer._id));
+    res.setHeader(
+      "Access-Control-Expose-Headers",
+      "Content-Disposition, X-Volunteer-Id, X-Volunteer-Record-Id"
+    );
+    return res.send(pdfBuffer);
   } catch (error) {
     console.error("Create volunteer error:", error);
     return res.status(500).json({ success: false, message: "Something went wrong" });
   }
 };
 
-// Generates and streams the volunteer's ID card as a downloadable PDF.
+// Re-generates a volunteer's ID card on demand (e.g. from an admin
+// dashboard), fetching the photo back out of S3. This is intentionally
+// the slower path — the main submit flow above never calls it.
 export const getVolunteerIdCardController = async (req: Request, res: Response) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -100,9 +138,6 @@ export const getVolunteerIdCardController = async (req: Request, res: Response) 
       return res.status(404).json({ success: false, message: "Volunteer not found" });
     }
 
-    // Pull the photo bytes back from S3. If this fails for any reason
-    // (object missing, transient S3 error), fall back to the initial-letter
-    // placeholder rather than failing the whole card.
     let photoBuffer: Buffer | undefined;
     if (volunteer.photoKey) {
       try {

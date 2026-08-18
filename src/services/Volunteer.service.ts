@@ -12,6 +12,7 @@ interface CreateVolunteerData {
   interestArea?: string;
   contributions: string[];
   photoKey?: string;
+  volunteerId: string;
 }
 
 // Volunteer IDs look like NWRT-VOL-2026-000123 — year plus a running count
@@ -30,11 +31,14 @@ export const generateVolunteerId = async (): Promise<string> => {
   return `NWRT-VOL-${year}-${sequence}`;
 };
 
+// Takes volunteerId as an argument now (generated once, up front, by the
+// controller) instead of generating it internally — that lets the
+// controller run this insert, the S3 upload, and the PDF render all at
+// the same time instead of one after another.
 export const createVolunteer = async (
   data: CreateVolunteerData
 ): Promise<IVolunteer> => {
-  const volunteerId = await generateVolunteerId();
-  return await Volunteer.create({ ...data, volunteerId });
+  return await Volunteer.create(data);
 };
 
 export const getVolunteerById = async (
