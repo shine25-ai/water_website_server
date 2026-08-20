@@ -15,6 +15,7 @@ import galleryRoutes from "./routes/Gallery.routes.js";
 import newsupdateRoutes from "./routes/Newsupdate.routes.js";
 import documentRoutes from "./routes/Document.routes.js";
 
+
 dotenv.config();
 
 console.log("[env check]", {
@@ -57,6 +58,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/gallery", galleryRoutes);
 app.use("/api/news", newsupdateRoutes);
 app.use("/api/documents", documentRoutes);
+
 
 // Base API route
 app.get("/api", (req, res) => {

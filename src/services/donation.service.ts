@@ -2,7 +2,8 @@ import Donation from "../models/donation.model.js";
 import type { IDonation, DonorType } from "../models/donation.model.js";
 
 interface CreateDonationData {
-  firstName: string;
+  firstName?: string;
+  companyName?: string;
   email: string;
   mobileNumber: string;
   donorType: DonorType;
@@ -118,4 +119,16 @@ export const getTotalRaisedAmount = async (): Promise<{
     totalAmount: result[0].totalAmount,
     donorCount: result[0].donorCount,
   };
+};
+
+// Single source of truth for "what name do we print/email this donor
+// under" — CSR uses companyName, Public/Party use firstName. Used by
+// both the controller (email) and invoice.util.ts (PDF), so the two
+// can never disagree on which name to show.
+export const getDonorDisplayName = (
+  donation: Pick<IDonation, "donorType" | "firstName" | "companyName">
+): string => {
+  return donation.donorType === "CSR"
+    ? donation.companyName || "Valued Partner"
+    : donation.firstName || "Valued Donor";
 };

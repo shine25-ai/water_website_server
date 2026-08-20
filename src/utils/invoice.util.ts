@@ -3,7 +3,8 @@ import PDFDocument from "pdfkit";
 interface InvoiceData {
   invoiceNumber: string;
   invoiceDate: Date;
-  firstName: string;
+  firstName?: string;
+  companyName?: string;
   email: string;
   mobileNumber: string;
   donorType: string;
@@ -14,18 +15,22 @@ interface InvoiceData {
 }
 
 // Trust's own details — fill these in with the real registered values
-// before going live. GSTIN is required on every line if the trust is
-// GST-registered; if it is not registered, remove the GSTIN line/field
-// entirely rather than leaving it blank, since a blank GSTIN field on an
-// invoice can be read as non-compliant rather than "not applicable".
+// before going live.
 const ORG_DETAILS = {
   name: "Nallathangal Water Resources Trust",
   address: "Dharapuram, Tiruppur – Tamil Nadu",
-  gstin: "PLACEHOLDER_GSTIN", // TODO: replace with real GSTIN
-  pan: "PLACEHOLDER_PAN", // TODO: replace with real PAN
   email: "info@nallathangaltrust.org",
   phone: "+91 98765 43210",
 };
+
+// CSR is billed under the company name; Public/Party under the
+// donor's first name. Kept as a tiny local helper (rather than
+// importing the service) so this util has no dependency on Mongoose.
+function resolveBilledName(data: InvoiceData): string {
+  return data.donorType === "CSR"
+    ? data.companyName || "Valued Partner"
+    : data.firstName || "Valued Donor";
+}
 
 // Builds the invoice PDF in memory and resolves with a Buffer — no temp
 // files written to disk, so it can go straight into a mail attachment.
@@ -49,10 +54,6 @@ export function generateDonationInvoice(data: InvoiceData): Promise<Buffer> {
         .font("Helvetica")
         .text(ORG_DETAILS.address, { align: "center" });
       doc.text(
-        `GSTIN: ${ORG_DETAILS.gstin}  |  PAN: ${ORG_DETAILS.pan}`,
-        { align: "center" }
-      );
-      doc.text(
         `${ORG_DETAILS.email}  |  ${ORG_DETAILS.phone}`,
         { align: "center" }
       );
@@ -68,7 +69,10 @@ export function generateDonationInvoice(data: InvoiceData): Promise<Buffer> {
       doc
         .fontSize(14)
         .font("Helvetica-Bold")
-        .text("Donation Receipt / Tax Invoice", { align: "center" });
+        .text(
+          data.donorType === "CSR" ? "CSR Partnership Receipt / Tax Invoice" : "Donation Receipt / Tax Invoice",
+          { align: "center" }
+        );
       doc.moveDown(1.5);
 
       // Invoice meta
@@ -83,16 +87,20 @@ export function generateDonationInvoice(data: InvoiceData): Promise<Buffer> {
 
       doc.moveDown(1.5);
 
-      // Donor details
+      // Donor details — label and value both switch for CSR
       doc.font("Helvetica-Bold").text("Billed To:", 50, doc.y);
       doc.moveDown(0.3);
-      doc.font("Helvetica").text(data.firstName);
+      doc.font("Helvetica").text(resolveBilledName(data));
       doc.text(data.address);
       doc.text(`Mobile: ${data.mobileNumber}`);
       doc.text(`Email: ${data.email}`);
       doc.text(`Donor Type: ${data.donorType}`);
       if (data.panOrGstNumber) {
-        doc.text(`PAN/GSTIN: ${data.panOrGstNumber}`);
+        doc.text(
+          data.donorType === "CSR"
+            ? `GSTIN: ${data.panOrGstNumber}`
+            : `PAN/GSTIN: ${data.panOrGstNumber}`
+        );
       }
 
       doc.moveDown(1.5);
@@ -111,7 +119,12 @@ export function generateDonationInvoice(data: InvoiceData): Promise<Buffer> {
 
       const rowTop = tableTop + 25;
       doc.font("Helvetica");
-      doc.text("Voluntary Donation", 50, rowTop, { width: 240 });
+      doc.text(
+        data.donorType === "CSR" ? "CSR Partnership Contribution" : "Voluntary Donation",
+        50,
+        rowTop,
+        { width: 240 }
+      );
       doc.text(data.razorpayPaymentId, 300, rowTop, { width: 140 });
       doc.text(data.amount.toLocaleString("en-IN"), 450, rowTop, {
         width: 95,
@@ -137,7 +150,9 @@ export function generateDonationInvoice(data: InvoiceData): Promise<Buffer> {
         .font("Helvetica-Oblique")
         .fillColor("#555555")
         .text(
-          "Note: Donations to registered charitable trusts may be eligible for tax exemption under applicable sections of the Income Tax Act. This receipt confirms the payment received; please retain it for your records.",
+          data.donorType === "CSR"
+            ? "Note: This contribution is made under Corporate Social Responsibility (CSR) obligations and may be eligible for CSR reporting under applicable regulations. This receipt confirms the payment received; please retain it for your records."
+            : "Note: Donations to registered charitable trusts may be eligible for tax exemption under applicable sections of the Income Tax Act. This receipt confirms the payment received; please retain it for your records.",
           50,
           doc.y,
           { width: 495 }
