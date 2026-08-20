@@ -12,20 +12,34 @@ import {
   generateInvoiceNumber,
   attachInvoiceNumber,
   markInvoiceEmailSent,
+  getDonorDisplayName,
 } from "../services/donation.service.js";
+import {
+  findVolunteerByEmailOrMobile,
+  createVolunteerFromDonation,
+} from "../services/Volunteer.service.js";
 import { generateDonationInvoice } from "../utils/invoice.util.js";
-import { sendDonationInvoiceEmail } from "../utils/send.util.js";
+import { sendDonationInvoiceEmail, sendVolunteerWelcomeEmail } from "../utils/send.util.js";
 
 const VALID_DONOR_TYPES = ["CSR", "Public", "Party"];
 
 export const createDonationController = async (req: Request, res: Response) => {
   try {
-    const { firstName, email, mobileNumber, donorType, panOrGstNumber, address, amount } = req.body;
+    const {
+      firstName,
+      companyName,
+      email,
+      mobileNumber,
+      donorType,
+      panOrGstNumber,
+      address,
+      amount,
+    } = req.body;
 
-    if (!firstName || !email || !mobileNumber || !donorType || !address || !amount) {
+    if (!email || !mobileNumber || !donorType || !address || !amount) {
       return res.status(400).json({
         success: false,
-        message: "First name, email, mobile number, donor type, address and amount are required",
+        message: "Email, mobile number, donor type, address and amount are required",
       });
     }
 
@@ -34,6 +48,29 @@ export const createDonationController = async (req: Request, res: Response) => {
         success: false,
         message: "Donor type must be one of CSR, Public or Party",
       });
+    }
+
+    // Name and GST requirement depend on donor type
+    if (donorType === "CSR") {
+      if (!companyName) {
+        return res.status(400).json({
+          success: false,
+          message: "Company name is required for CSR donations",
+        });
+      }
+      if (!panOrGstNumber) {
+        return res.status(400).json({
+          success: false,
+          message: "GST number is required for CSR donations",
+        });
+      }
+    } else {
+      if (!firstName) {
+        return res.status(400).json({
+          success: false,
+          message: "First name is required",
+        });
+      }
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -53,6 +90,7 @@ export const createDonationController = async (req: Request, res: Response) => {
 
     const donation = await createDonation({
       firstName,
+      companyName,
       email,
       mobileNumber,
       donorType,
@@ -96,7 +134,7 @@ export const createDonationOrderController = async (req: Request, res: Response)
       payment_capture: true,
       notes: {
         donationId: String(donation._id),
-        firstName: donation.firstName,
+        donorName: getDonorDisplayName(donation),
         email: donation.email,
       },
     });
@@ -161,6 +199,7 @@ export const verifyDonationPaymentController = async (req: Request, res: Respons
         invoiceNumber,
         invoiceDate: new Date(),
         firstName: donation.firstName,
+        companyName: donation.companyName,
         email: donation.email,
         mobileNumber: donation.mobileNumber,
         donorType: donation.donorType,
@@ -170,17 +209,64 @@ export const verifyDonationPaymentController = async (req: Request, res: Respons
         razorpayPaymentId: razorpay_payment_id,
       });
 
-      await sendDonationInvoiceEmail({
+      const invoiceMailResult = await sendDonationInvoiceEmail({
         donorEmail: donation.email,
-        donorName: donation.firstName,
+        donorName: getDonorDisplayName(donation),
         invoiceNumber,
         amount: donation.amount,
         pdfBuffer,
       });
 
+      console.log("Donation invoice email sent:", {
+        messageId: invoiceMailResult.messageId,
+        accepted: invoiceMailResult.accepted,
+        rejected: invoiceMailResult.rejected,
+      });
+
       await markInvoiceEmailSent(donationId);
     } catch (emailErr: any) {
       console.error("Invoice email failed (payment still recorded as paid):", emailErr.message);
+    }
+
+    // If this donor isn't already a registered volunteer, spin up an
+    // account for them from the donation details. Best-effort, same
+    // reasoning as the invoice email above — never let this touch the
+    // payment response, since the payment already succeeded either way.
+    try {
+      const existingVolunteer = await findVolunteerByEmailOrMobile(
+        donation.email,
+        donation.mobileNumber
+      );
+
+      if (!existingVolunteer) {
+        const { volunteer, rawToken } = await createVolunteerFromDonation({
+          name: getDonorDisplayName(donation),
+          email: donation.email,
+          mobile: donation.mobileNumber,
+        });
+
+        if (!process.env.FRONTEND_URL) {
+          console.error("FRONTEND_URL is not set — cannot build volunteer set-password link");
+        } else {
+          const setPasswordUrl = `${process.env.FRONTEND_URL}/volunteer/set-password?token=${rawToken}`;
+
+          const welcomeMailResult = await sendVolunteerWelcomeEmail({
+            volunteerEmail: volunteer.email,
+            volunteerName: volunteer.name,
+            setPasswordUrl,
+          });
+
+          console.log("Volunteer welcome email sent:", {
+            messageId: welcomeMailResult.messageId,
+            accepted: welcomeMailResult.accepted,
+            rejected: welcomeMailResult.rejected,
+          });
+        }
+      } else {
+        console.log("Skipped volunteer creation — already a volunteer:", existingVolunteer.email);
+      }
+    } catch (volunteerErr: any) {
+      console.error("Auto volunteer creation failed (donation still recorded as paid):", volunteerErr.message);
     }
 
     return res.status(200).json({
@@ -238,10 +324,6 @@ export const getTotalRaisedController = async (req: Request, res: Response) => {
 };
 
 // Regenerates and streams the donation invoice as a downloadable PDF.
-// Used for the auto-download right after payment verification on the
-// frontend, and can also be reused later for a "resend/redownload my
-// receipt" feature if needed — same pdfkit-in-memory pattern as the
-// volunteer ID card.
 export const getDonationInvoiceController = async (req: Request, res: Response) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -262,6 +344,7 @@ export const getDonationInvoiceController = async (req: Request, res: Response) 
       invoiceNumber: donation.invoiceNumber,
       invoiceDate: donation.updatedAt,
       firstName: donation.firstName,
+      companyName: donation.companyName,
       email: donation.email,
       mobileNumber: donation.mobileNumber,
       donorType: donation.donorType,

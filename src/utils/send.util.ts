@@ -8,6 +8,12 @@ interface SendInvoiceEmailParams {
   pdfBuffer: Buffer;
 }
 
+interface SendVolunteerWelcomeEmailParams {
+  volunteerEmail: string;
+  volunteerName: string;
+  setPasswordUrl: string;
+}
+
 const COMPANY_EMAIL = process.env.COMPANY_NOTIFY_EMAIL || "akkrish157@gmail.com";
 
 export async function sendDonationInvoiceEmail({
@@ -38,7 +44,8 @@ export async function sendDonationInvoiceEmail({
 
   // Donor gets the email as the primary recipient; the company mailbox is
   // BCC'd so it gets a copy for records without the donor seeing that address.
-  await mailTransporter.sendMail({
+  // Returns the send result so callers can log messageId/accepted/rejected.
+  return await mailTransporter.sendMail({
     from: `"Nallathangal Water Resources Trust" <${process.env.SMTP_USER}>`,
     to: donorEmail,
     bcc: COMPANY_EMAIL,
@@ -51,5 +58,49 @@ export async function sendDonationInvoiceEmail({
         contentType: "application/pdf",
       },
     ],
+  });
+}
+
+// Sent to the donor's own email (volunteerEmail is always donation.email —
+// see verifyDonationPaymentController) right after the receipt email, to
+// welcome them as a newly auto-enrolled volunteer.
+export async function sendVolunteerWelcomeEmail({
+  volunteerEmail,
+  volunteerName,
+  setPasswordUrl,
+}: SendVolunteerWelcomeEmailParams) {
+  const subject = `You're now a registered volunteer | Nallathangal Water Resources Trust`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #0b3d2e; line-height: 1.5;">
+      <h2 style="color: #0b3d2e;">Welcome aboard, ${volunteerName}!</h2>
+      <p>Thank you for your donation. Alongside your receipt, we've set up a volunteer account for you so you can track your contributions and get involved further with the Nallathangal Water Resources Trust.</p>
+      <p>
+        
+          href="${setPasswordUrl}"
+          style="display: inline-block; background-color: #0b3d2e; color: #ffffff; padding: 10px 20px; border-radius: 4px; text-decoration: none;"
+        >
+          Set your password
+        </a>
+      </p>
+      <p style="font-size: 13px; color: #555;">This link expires in 24 hours. Once you're in, you can finish the rest of your volunteer profile (village, district, and more) any time.</p>
+      <br />
+      <p style="font-size: 13px; color: #555;">
+        Nallathangal Water Resources Trust<br />
+        Dharapuram, Tiruppur – Tamil Nadu<br />
+        info@nallathangaltrust.org
+      </p>
+    </div>
+  `;
+
+  // Returns the send result so the caller can log messageId/accepted/
+  // rejected — sendMail can resolve without throwing even if the
+  // receiving server soft-rejects the message, and without this there's
+  // no visibility into that.
+  return await mailTransporter.sendMail({
+    from: `"Nallathangal Water Resources Trust" <${process.env.SMTP_USER}>`,
+    to: volunteerEmail,
+    subject,
+    html,
   });
 }
