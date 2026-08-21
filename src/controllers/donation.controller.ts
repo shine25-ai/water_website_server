@@ -5,6 +5,7 @@ import {
   createDonation,
   getAllDonations,
   getDonationById,
+  getDonationsByContact,
   attachRazorpayOrder,
   markDonationPaid,
   markDonationFailed,
@@ -17,9 +18,11 @@ import {
 import {
   findVolunteerByEmailOrMobile,
   createVolunteerFromDonation,
+  getVolunteerById,
 } from "../services/Volunteer.service.js";
 import { generateDonationInvoice } from "../utils/invoice.util.js";
 import { sendDonationInvoiceEmail, sendVolunteerWelcomeEmail } from "../utils/send.util.js";
+import type { AuthenticatedVolunteerRequest } from "../middleware/volunteerAuth.middleware.js";
 
 const VALID_DONOR_TYPES = ["CSR", "Public", "Party"];
 
@@ -300,6 +303,30 @@ export const getDonationByIdController = async (req: Request, res: Response) => 
     return res.status(200).json({ success: true, data: donation });
   } catch (error) {
     console.error("Get donation error:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+};
+
+// Powers the volunteer-facing "My Donations" page — returns only the
+// donations belonging to the currently authenticated volunteer, matched
+// by their own email/mobile (same pairing the donation flow itself uses
+// via findVolunteerByEmailOrMobile). Volunteer-gated rather than
+// admin-gated, since this is a volunteer viewing their own history, not
+// an admin viewing everyone's.
+export const getMyDonationsController = async (
+  req: AuthenticatedVolunteerRequest,
+  res: Response
+) => {
+  try {
+    const volunteer = await getVolunteerById(req.volunteerId as string);
+    if (!volunteer) {
+      return res.status(404).json({ success: false, message: "Volunteer not found" });
+    }
+
+    const donations = await getDonationsByContact(volunteer.email, volunteer.mobile);
+    return res.status(200).json({ success: true, data: donations });
+  } catch (error) {
+    console.error("Get my donations error:", error);
     return res.status(500).json({ success: false, message: "Something went wrong" });
   }
 };
