@@ -28,6 +28,21 @@ export const getDonationById = async (
   return await Donation.findById(id);
 };
 
+// Powers the volunteer-facing "My Donations" page — a volunteer who
+// became one via donating (source: "donation") looks up their own
+// donation history by matching on the same email/mobile pair the
+// donation flow itself matches on (see findVolunteerByEmailOrMobile),
+// so there's no need for a separate volunteerId link on the Donation
+// model.
+export const getDonationsByContact = async (
+  email: string,
+  mobile: string
+): Promise<IDonation[]> => {
+  return await Donation.find({
+    $or: [{ email: email.toLowerCase().trim() }, { mobileNumber: mobile.trim() }],
+  }).sort({ createdAt: -1 });
+};
+
 export const attachRazorpayOrder = async (
   donationId: string,
   razorpayOrderId: string

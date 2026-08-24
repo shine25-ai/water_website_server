@@ -78,7 +78,7 @@ export async function sendVolunteerWelcomeEmail({
       <p>
         
           href="${setPasswordUrl}"
-          style="display: inline-block; background-color: #0b3d2e; color: #ffffff; padding: 10px 20px; border-radius: 4px; text-decoration: none;"
+          
         >
           Set your password
         </a>
