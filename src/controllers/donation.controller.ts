@@ -14,6 +14,7 @@ import {
   attachInvoiceNumber,
   markInvoiceEmailSent,
   getDonorDisplayName,
+  deleteDonationById,
 } from "../services/donation.service.js";
 import {
   findVolunteerByEmailOrMobile,
@@ -389,6 +390,26 @@ export const getDonationInvoiceController = async (req: Request, res: Response) 
     return res.send(pdfBuffer);
   } catch (error) {
     console.error("Generate donation invoice error:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+};
+
+// Admin-only: permanently deletes a donation record from the table.
+export const deleteDonationController = async (req: Request, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const donation = await deleteDonationById(id);
+
+    if (!donation) {
+      return res.status(404).json({ success: false, message: "Donation not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Donation deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete donation error:", error);
     return res.status(500).json({ success: false, message: "Something went wrong" });
   }
 };
