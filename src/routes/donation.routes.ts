@@ -8,6 +8,7 @@ import {
   getMyDonationsController,
   getTotalRaisedController,
   getDonationInvoiceController,
+  deleteDonationController,
 } from "../controllers/donation.controller.js";
 import { requireAdminAuth } from "../middleware/Adminauth.middleware.js";
 import { requireVolunteerAuth } from "../middleware/volunteerAuth.middleware.js";
@@ -43,5 +44,6 @@ router.get("/:id/invoice", getDonationInvoiceController);
 // consumption.
 router.get("/", requireAdminAuth, getAllDonationsController);
 router.get("/:id", requireAdminAuth, getDonationByIdController);
+router.delete("/:id", requireAdminAuth, deleteDonationController);
 
 export default router;

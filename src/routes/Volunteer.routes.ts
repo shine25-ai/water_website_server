@@ -4,6 +4,7 @@ import {
   createVolunteerController,
   getVolunteerIdCardController,
   getAllVolunteersController,
+  getPublicVolunteersController,
   setVolunteerPasswordController,
   volunteerLoginController,
   getVolunteerProfileController,
@@ -38,6 +39,11 @@ router.put("/me", requireVolunteerAuth, updateVolunteerProfileController);
 router.post("/me/photo", requireVolunteerAuth, upload.single("photo"), uploadVolunteerPhotoController);
 router.get("/me/photo", requireVolunteerAuth, getVolunteerPhotoController);
 router.delete("/me/photo", requireVolunteerAuth, removeVolunteerPhotoController);
+
+// Public — unauthenticated, safe projection only (no email/mobile/auth
+// fields). Powers the About Us page's volunteer grid. Declared before the
+// admin-gated "/" below so it's never mistakenly shadowed.
+router.get("/public", getPublicVolunteersController);
 
 // Public — a volunteer self-registering via the site form, not an admin.
 router.post("/", upload.single("photo"), createVolunteerController);

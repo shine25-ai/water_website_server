@@ -108,6 +108,15 @@ export const markDonationFailed = async (donationId: string) => {
   );
 };
 
+// Permanently removes a donation record (admin action from the
+// donations table). Returns the deleted doc, or null if the id
+// didn't match anything — the controller uses that to 404.
+export const deleteDonationById = async (
+  donationId: string
+): Promise<IDonation | null> => {
+  return await Donation.findByIdAndDelete(donationId);
+};
+
 // Sums the amount field (in rupees) across all successfully paid donations.
 // Uses an aggregation pipeline so the total is computed in the DB, not
 // pulled into Node and summed in JS (cheap now, but scales badly later).

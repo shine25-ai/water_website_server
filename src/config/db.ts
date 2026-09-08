@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 export const connectDB = async (): Promise<void> => {
   const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/water_website_db";
 
+  console.log(`[MongoDB] Attempting connection to ${mongoUri}`);
+
   mongoose.connection.on("connected", () => {
     console.log(`[MongoDB] Connected successfully to ${mongoose.connection.host}/${mongoose.connection.name}`);
   });
