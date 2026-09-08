@@ -242,11 +242,18 @@ export const verifyDonationPaymentController = async (req: Request, res: Respons
         donation.mobileNumber
       );
 
+      console.log(existingVolunteer)
+
+      console.log(donation.email)
+      console.log(donation.mobileNumber)
+
       if (!existingVolunteer) {
         const { volunteer, rawToken } = await createVolunteerFromDonation({
           name: getDonorDisplayName(donation),
           email: donation.email,
           mobile: donation.mobileNumber,
+
+          
         });
 
         if (!process.env.FRONTEND_URL) {
@@ -268,6 +275,7 @@ export const verifyDonationPaymentController = async (req: Request, res: Respons
         }
       } else {
         console.log("Skipped volunteer creation — already a volunteer:", existingVolunteer.email);
+        console.log(existingVolunteer)
       }
     } catch (volunteerErr: any) {
       console.error("Auto volunteer creation failed (donation still recorded as paid):", volunteerErr.message);

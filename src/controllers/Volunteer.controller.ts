@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import Volunteer from "../models/Volunteer.model.js";
 import {
   generateVolunteerId,
   registerVolunteerSelf,
@@ -222,6 +223,39 @@ export const getAllVolunteersController = async (req: Request, res: Response) =>
     return res.status(200).json({ success: true, data: volunteers });
   } catch (error) {
     console.error("Get volunteers error:", error);
+    return res.status(500).json({ success: false, message: "Something went wrong" });
+  }
+};
+
+// Public, unauthenticated endpoint for the About Us page. Queries the
+// model directly (no service-layer indirection) since this is a one-off,
+// public-safe projection — no email/mobile or account/auth fields go out,
+// and every volunteer is included regardless of profile-completion status.
+// Signed photo URLs are resolved in parallel per volunteer.
+export const getPublicVolunteersController = async (req: Request, res: Response) => {
+  try {
+    const volunteers = await Volunteer.find()
+      .select(
+        "volunteerId name village district profession interestArea contributions photoKey createdAt"
+      )
+      .sort({ createdAt: -1 });
+
+    const data = await Promise.all(
+      volunteers.map(async (v) => ({
+        volunteerId: v.volunteerId,
+        name: v.name,
+        village: v.village,
+        district: v.district,
+        profession: v.profession,
+        interestArea: v.interestArea,
+        contributions: v.contributions,
+        photoUrl: v.photoKey ? await getSignedPhotoUrl(v.photoKey) : null,
+      }))
+    );
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("Get public volunteers error:", error);
     return res.status(500).json({ success: false, message: "Something went wrong" });
   }
 };
