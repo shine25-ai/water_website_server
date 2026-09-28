@@ -14,6 +14,16 @@ interface SendVolunteerWelcomeEmailParams {
   setPasswordUrl: string;
 }
 
+// Names come from user input (donation form), so escape them before
+// dropping into HTML to avoid broken markup / injection in the email.
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 export async function sendDonationInvoiceEmail({
   donorEmail,
   donorName,
@@ -22,10 +32,11 @@ export async function sendDonationInvoiceEmail({
   pdfBuffer,
 }: SendInvoiceEmailParams) {
   const subject = `Donation Receipt – ${invoiceNumber} | Nallathangal Water Resources Trust`;
+  const safeName = escapeHtml(donorName);
 
   const html = `
     <div style="font-family: Arial, sans-serif; color: #0b3d2e; line-height: 1.5;">
-      <h2 style="color: #0b3d2e;">Thank you for your donation, ${donorName}!</h2>
+      <h2 style="color: #0b3d2e;">Thank you for your donation, ${safeName}!</h2>
       <p>We've received your donation of <strong>₹${amount.toLocaleString(
         "en-IN"
       )}</strong> in support of the Nallathangal Water Resources Trust.</p>
@@ -66,17 +77,21 @@ export async function sendVolunteerWelcomeEmail({
   setPasswordUrl,
 }: SendVolunteerWelcomeEmailParams) {
   const subject = `You're now a registered volunteer | Nallathangal Water Resources Trust`;
+  const safeName = escapeHtml(volunteerName);
 
+  // FIX: the original was missing the opening "<a" — the attributes
+  // (href/style) and closing "</a>" were there, so the mail rendered the
+  // raw text `href="..."` instead of a button.
   const html = `
     <div style="font-family: Arial, sans-serif; color: #0b3d2e; line-height: 1.5;">
-      <h2 style="color: #0b3d2e;">Welcome aboard, ${volunteerName}!</h2>
+      <h2 style="color: #0b3d2e;">Welcome aboard, ${safeName}!</h2>
       <p>
         Thank you for your donation. Alongside your receipt, we've set up a
         volunteer account for you so you can track your contributions and get
         involved further with the Nallathangal Water Resources Trust.
       </p>
       <p style="margin: 24px 0;">
-        
+        <a
           href="${setPasswordUrl}"
           style="
             display: inline-block;
@@ -92,6 +107,10 @@ export async function sendVolunteerWelcomeEmail({
         </a>
       </p>
       <p style="font-size: 13px; color: #555;">
+        Button not working? Copy and paste this link into your browser:<br />
+        <span style="word-break: break-all;">${setPasswordUrl}</span>
+      </p>
+      <p style="font-size: 13px; color: #555;">
         This link expires in 24 hours. Once you're in, you can finish the rest
         of your volunteer profile (village, district, and more) any time.
       </p>
@@ -104,10 +123,19 @@ export async function sendVolunteerWelcomeEmail({
     </div>
   `;
 
+  // Plain-text alternative: improves deliverability (spam filters like a
+  // text part) and works in clients that block HTML.
+  const text =
+    `Welcome aboard, ${volunteerName}!\n\n` +
+    `Thank you for your donation. We've set up a volunteer account for you.\n` +
+    `Set your password here (expires in 24 hours):\n${setPasswordUrl}\n\n` +
+    `Nallathangal Water Resources Trust\nDharapuram, Tiruppur – Tamil Nadu\ninfo@nallathangaltrust.org`;
+
   return await mailTransporter.sendMail({
     from: `"Nallathangal Water Resources Trust" <${process.env.SMTP_USER}>`,
     to: volunteerEmail,
     subject,
     html,
+    text,
   });
 }
