@@ -36,6 +36,7 @@ export const updateOverviewController = async (req: Request, res: Response) => {
       beforeLabel,
       beforeCaption,
       afterLabel,
+      afterCaption,
       checklistTitle,
       checklist,
     } = req.body;
@@ -48,6 +49,7 @@ export const updateOverviewController = async (req: Request, res: Response) => {
     if (beforeLabel !== undefined) updateData.beforeLabel = beforeLabel;
     if (beforeCaption !== undefined) updateData.beforeCaption = beforeCaption;
     if (afterLabel !== undefined) updateData.afterLabel = afterLabel;
+    if (afterCaption !== undefined) updateData.afterCaption = afterCaption;
     if (checklistTitle !== undefined) updateData.checklistTitle = checklistTitle;
 
     if (goals !== undefined) {

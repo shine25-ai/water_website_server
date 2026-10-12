@@ -14,6 +14,7 @@ import dashboardRoutes from "./routes/Dashboard.routes.js";
 import galleryRoutes from "./routes/Gallery.routes.js";
 import newsupdateRoutes from "./routes/Newsupdate.routes.js";
 import documentRoutes from "./routes/Document.routes.js";
+import aboutRoutes from "./routes/About.routes.js";
 
 
 
@@ -59,6 +60,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/gallery", galleryRoutes);
 app.use("/api/news", newsupdateRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/about", aboutRoutes);
 ;
 
 
