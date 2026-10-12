@@ -20,6 +20,7 @@ const DEFAULT_OVERVIEW = {
   beforeLabel: "Before (1.0)",
   beforeCaption: "வறண்டு மேடான அணை",
   afterLabel: "After (2.0)",
+  afterCaption: "நீர் நிறைந்த பசுமை அணை",
   checklistTitle: "நல்லதங்காள் 2.0 – முழுமையான மறுசீரமைப்பு",
   checklist: [
     "முழு அணை பகுதி சீமைக்கருவேல் அகற்றுதல்",
@@ -45,6 +46,7 @@ interface UpdateOverviewData {
   beforeImageKey?: string;
   beforeImageUrl?: string;
   afterLabel?: string;
+  afterCaption?: string;
   afterImageKey?: string;
   afterImageUrl?: string;
   checklistTitle?: string;

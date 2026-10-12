@@ -16,6 +16,7 @@ export interface IOverviewContent extends Document {
   beforeImageKey?: string;
   beforeImageUrl?: string;
   afterLabel: string;
+  afterCaption: string;
   afterImageKey?: string;
   afterImageUrl?: string;
   checklistTitle: string;
@@ -47,6 +48,7 @@ const overviewContentSchema = new Schema<IOverviewContent>(
     beforeImageKey: { type: String },
     beforeImageUrl: { type: String },
     afterLabel: { type: String, trim: true },
+    afterCaption: { type: String, trim: true },
     afterImageKey: { type: String },
     afterImageUrl: { type: String },
     checklistTitle: { type: String, trim: true },
