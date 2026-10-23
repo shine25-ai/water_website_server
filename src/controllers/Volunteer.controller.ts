@@ -249,6 +249,7 @@ export const getPublicVolunteersController = async (req: Request, res: Response)
         profession: v.profession,
         interestArea: v.interestArea,
         contributions: v.contributions,
+        joinedAt: v.createdAt, // 👈 only this line is new
         photoUrl: v.photoKey ? await getSignedPhotoUrl(v.photoKey) : null,
       }))
     );
